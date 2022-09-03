@@ -1,30 +1,41 @@
 pipeline {
     agent any
-    triggers { pollSCM('* * * * *') }
+
+    triggers {
+        pollSCM '* * * * *'
+    }
+
     stages {
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/g0t4/jgsu-spring-petclinic.git', branch: 'main'
-            }            
+                git branch: 'main', url: 'https://github.com/Roushangopal/jgsu-spring-petclinic.git'
+            }
         }
         stage('Build') {
             steps {
+                // Run Maven on a Unix agent.
                 sh './mvnw clean package'
-                //sh 'false' // true
             }
-        
+
+            post {
+                success {
+                      emailext attachLog: true, 
+                      body: 'Please go to ${BUILD_URL} and verify the build', 
+                      to: "test@jenkins.com",
+                      compressLog: true, 
+                      recipientProviders: [upstreamDevelopers()], 
+                      subject: 'Job \'${JOB_NAME}\' (${BUILD_NUMBER}) is waiting for input'
+                }
+            }
+        }
+        stage('Post') {
+            steps {
+                echo "Done"
+            }
             post {
                 always {
                     junit '**/target/surefire-reports/TEST-*.xml'
                     archiveArtifacts 'target/*.jar'
-                }
-                changed {
-                    emailext subject: "Job \'${JOB_NAME}\' (build ${BUILD_NUMBER}) ${currentBuild.result}",
-                        body: "Please go to ${BUILD_URL} and verify the build", 
-                        attachLog: true, 
-                        compressLog: true, 
-                        to: "test@jenkins",
-                        recipientProviders: [upstreamDevelopers(), requestor()]
                 }
             }
         }
